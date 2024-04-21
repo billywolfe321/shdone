@@ -53,6 +53,7 @@ class ReportBug extends StatelessWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text("Report submitted for review!"))
                   );
+                  Navigator.of(context).pop();
                 },
                 color: Color(0xffae32ff),
                 elevation: 0,

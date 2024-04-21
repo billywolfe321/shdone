@@ -69,7 +69,42 @@ class AccountSettings extends StatelessWidget {
   }
 
   void _showChangeEmailDialog(BuildContext context) {
-    //todo email dialog
+    TextEditingController newEmailController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Change Email'),
+          content: TextField(
+            controller: newEmailController,
+            decoration: InputDecoration(
+              labelText: 'New Email',
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: Text('Change'),
+              onPressed: () async {
+                final user = FirebaseAuth.instance.currentUser;
+                final newEmail = newEmailController.text.trim();
+
+                try {
+                  await user!.updateEmail(newEmail);
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Email changed successfully')));
+                } catch (error) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to change email. Please try again.')));
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showDeleteAccountDialog(BuildContext context) {

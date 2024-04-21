@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'OtherUserProfile.dart';
+import 'OpenForum.dart';
 import 'FriendProfile.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -15,21 +16,21 @@ class _SearchScreenState extends State<SearchScreen> {
   String currentUserId = FirebaseAuth.instance.currentUser!.uid;
 
   void _performSearch(String query) async {
-    DatabaseReference ref = FirebaseDatabase.instance.ref('Users');
-    DatabaseEvent event = await ref.once();
+    DatabaseReference usersRef = FirebaseDatabase.instance.ref('Users');
+    DatabaseReference forumsRef = FirebaseDatabase.instance.ref('Forums');
+    DatabaseEvent userEvent = await usersRef.once();
+    DatabaseEvent forumEvent = await forumsRef.once();
 
     List<Map<String, dynamic>> results = [];
-    if (event.snapshot.exists) {
-      event.snapshot.children.forEach((child) {
-        if (child.key == currentUserId) {
-          return;
-        }
 
+    if (userEvent.snapshot.exists) {
+      userEvent.snapshot.children.forEach((child) {
+        if (child.key == currentUserId) return;
         Map<String, dynamic> userData = Map<String, dynamic>.from(child.value as Map);
         String username = userData['username'] ?? '';
-
         if (username.toLowerCase().contains(query.toLowerCase())) {
           results.add({
+            'type': 'user',
             'username': username,
             'key': child.key,
           });
@@ -37,8 +38,22 @@ class _SearchScreenState extends State<SearchScreen> {
       });
     }
 
+    if (forumEvent.snapshot.exists) {
+      forumEvent.snapshot.children.forEach((child) {
+        Map<String, dynamic> forumData = Map<String, dynamic>.from(child.value as Map);
+        String title = forumData['title'] ?? '';
+        if (title.toLowerCase().contains(query.toLowerCase())) {
+          results.add({
+            'type': 'forum',
+            'title': title,
+            'forumId': child.key,
+          });
+        }
+      });
+    }
+
     setState(() {
-      _searchResults = results.isEmpty ? [{'username': 'No results', 'key': ''}] : results;
+      _searchResults = results.isEmpty ? [{'type': 'none', 'title': 'No results'}] : results;
     });
   }
 
@@ -47,16 +62,15 @@ class _SearchScreenState extends State<SearchScreen> {
     final snapshot = await ref.child('Users/$currentUserId/friends/$userId').get();
 
     if (snapshot.exists) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => FriendProfile(friendId: userId)),
-      );
+      Navigator.push(context, MaterialPageRoute(builder: (_) => FriendProfile(friendId: userId)));
     } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => OtherUserProfile(userID: userId)),
-      );
+      Navigator.push(context, MaterialPageRoute(builder: (_) => OtherUserProfile(userID: userId)));
     }
+  }
+
+
+  void navigateToForum(String forumId) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => OpenForum(forumId: forumId)));
   }
 
   @override
@@ -88,10 +102,13 @@ class _SearchScreenState extends State<SearchScreen> {
         itemBuilder: (context, index) {
           var result = _searchResults[index];
           return ListTile(
-            title: Text(result['username']),
+            leading: Icon(result['type'] == 'user' ? Icons.person : Icons.forum),
+            title: Text(result['type'] == 'user' ? result['username'] : result['title']),
             onTap: () {
-              if (result.containsKey('key') && result['key'] != '') {
+              if (result['type'] == 'user') {
                 navigateToProfile(result['key']);
+              } else if (result['type'] == 'forum') {
+                navigateToForum(result['forumId']);
               }
             },
           );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'ReportPage.dart';
 import 'OpenDrawer.dart';
 
@@ -90,25 +91,52 @@ class _OpenForumState extends State<OpenForum> {
     }
   }
 
-  void sortComments(List<Map<String, dynamic>> commentsList) {
-    switch (currentFilter) {
-      case CommentFilter.mostLiked:
-        commentsList.sort((a, b) => (b['thumbsUp'] ?? 0).compareTo(a['thumbsUp'] ?? 0));
-        break;
-      case CommentFilter.mostRecent:
-        commentsList.sort((a, b) => (b['timestamp'] ?? 0).compareTo(a['timestamp'] ?? 0));
-        break;
-      case CommentFilter.oldest:
-        commentsList.sort((a, b) => (a['timestamp'] ?? 0).compareTo(b['timestamp'] ?? 0));
-        break;
-    }
-    comments = commentsList;
+  void sortComments(CommentFilter filter) {
+    setState(() {
+      comments.sort((a, b) {
+        switch (filter) {
+          case CommentFilter.mostLiked:
+            return (b['thumbsUp'] ?? 0).compareTo(a['thumbsUp'] ?? 0);
+          case CommentFilter.mostRecent:
+            return (b['timestamp'] ?? 0).compareTo(a['timestamp'] ?? 0);
+          case CommentFilter.oldest:
+            return (a['timestamp'] ?? 0).compareTo(b['timestamp'] ?? 0);
+        }
+      });
+    });
   }
 
   void navigateToReportPage(String commentId) {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => ReportPage(forumId: widget.forumId, commentId: commentId)),
+    );
+  }
+
+  Future<void> _launchURL(String url) async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Warning!'),
+        content: Text('You are about to download a file from the internet. Always ensure that the source is trustworthy to avoid security risks.'),
+        actions: <Widget>[
+          TextButton(
+            child: Text('Cancel'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          TextButton(
+            child: Text('Continue'),
+            onPressed: () async {
+              Navigator.of(context).pop();
+              if (await canLaunch(url)) {
+                await launch(url);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not launch $url')));
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -121,10 +149,8 @@ class _OpenForumState extends State<OpenForum> {
         actions: [
           PopupMenuButton<CommentFilter>(
             onSelected: (CommentFilter result) {
-              setState(() {
-                currentFilter = result;
-                sortComments(comments);
-              });
+              currentFilter = result;
+              sortComments(currentFilter);
             },
             itemBuilder: (BuildContext context) => <PopupMenuEntry<CommentFilter>>[
               const PopupMenuItem<CommentFilter>(
@@ -155,6 +181,15 @@ class _OpenForumState extends State<OpenForum> {
               Text(forumData?['title'] ?? 'No Title', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               SizedBox(height: 10),
               Text(forumData?['content'] ?? 'No Content', style: TextStyle(fontSize: 18)),
+
+              if (forumData?['fileUrl'] != null)
+                InkWell(
+                  onTap: () => _launchURL(forumData!['fileUrl']),
+                  child: Text(
+                    'Download Attached File',
+                    style: TextStyle(decoration: TextDecoration.underline, color: Colors.blue),
+                  ),
+                ),
               Divider(),
               Text('Comments:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ...comments.map((comment) => ListTile(

@@ -55,9 +55,11 @@ class _FriendsListState extends State<FriendsList> {
   void fetchFriendIds() {
     ref.child('Users/$userId/friends').onValue.listen((event) {
       final DataSnapshot snapshot = event.snapshot;
-      final friendsData = Map<String, dynamic>.from(snapshot.value as Map);
-      List<String> friendIds = friendsData.keys.toList();
-      fetchFriendsDetails(friendIds);
+      if (snapshot.exists) {
+        final friendsData = Map<String, dynamic>.from(snapshot.value as Map);
+        List<String> friendIds = friendsData.keys.toList();
+        fetchFriendsDetails(friendIds);
+      }
     });
   }
 
@@ -72,7 +74,7 @@ class _FriendsListState extends State<FriendsList> {
             friendsDetails.add({
               'id': id,
               'username': friendData['username'] ?? 'Unknown',
-              'profilePicture': friendData['profilePicture'] ?? 'default_profile_picture.png',
+              'profilePicture': friendData['profilePic'] != null ? getProfilePicturePath(friendData['profilePic']) : 'assets/default_profile_picture.png',
             });
           });
         }
@@ -80,43 +82,44 @@ class _FriendsListState extends State<FriendsList> {
     }
   }
 
+  String getProfilePicturePath(int? profilePicIndex) {
+    switch (profilePicIndex) {
+      case 1: return "assets/purple.png";
+      case 2: return "assets/blue.png";
+      case 3: return "assets/blue-purple.png";
+      case 4: return "assets/orange.png";
+      case 5: return "assets/pink.png";
+      case 6: return "assets/turquoise.png";
+      default: return "assets/default_profile_picture.png";
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: 'Search Friends...',
-              prefixIcon: Icon(Icons.search),
+    return Expanded(
+      child: ListView.builder(
+        itemCount: friendsDetails.length,
+        itemBuilder: (context, index) {
+          final friend = friendsDetails[index];
+          return ListTile(
+            leading: CircleAvatar(
+              backgroundImage: AssetImage(friend['profilePicture']),
             ),
-          ),
-        ),
-        Expanded(
-          child: ListView.builder(
-            itemCount: friendsDetails.length,
-            itemBuilder: (context, index) {
-              final friend = friendsDetails[index];
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundImage: NetworkImage(friend['profilePicture']),
-                ),
-                title: InkWell(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => FriendProfile(friendId: friend['id'])),
-                  ),
-                  child: Text(friend['username']),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
+            title: InkWell(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => FriendProfile(friendId: friend['id'])),
+              ),
+              child: Text(friend['username']),
+            ),
+          );
+        },
+      ),
     );
   }
 }
+
+
 class RequestsList extends StatefulWidget {
   @override
   _RequestsListState createState() => _RequestsListState();

@@ -1,4 +1,3 @@
-export 'ChangePassword.dart';
 export 'firebase_options.dart';
 export 'Forums.dart';
 export 'HomeScreen.dart';

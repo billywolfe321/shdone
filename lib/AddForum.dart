@@ -1,6 +1,9 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:login_and_registration/OpenDrawer.dart';
 
 class AddForum extends StatefulWidget {
@@ -15,6 +18,8 @@ class _AddForumState extends State<AddForum> {
   final DatabaseReference _databaseReference = FirebaseDatabase.instance.ref();
   List<String> subjects = [];
   String? selectedSubject;
+  Uint8List? _fileBytes;
+  String? _fileName;
 
   @override
   void initState() {
@@ -37,20 +42,65 @@ class _AddForumState extends State<AddForum> {
     }
   }
 
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _contentController.dispose();
-    super.dispose();
+  Future<void> pickFile() async {
+    final result = await FilePicker.platform.pickFiles(
+        allowMultiple: false,
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'png', 'jpeg', 'doc', 'docx'],
+        withData: true
+    );
+
+    if (result != null) {
+      String? pickedFileName = result.files.single.name;
+      List<String> allowedExtensions = ['pdf', 'png', 'jpeg', 'doc', 'docx'];
+      String fileExtension = pickedFileName.split('.').last;
+
+      if (!allowedExtensions.contains(fileExtension.toLowerCase())) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Invalid file type. Allowed types: PDF, PNG, JPEG, DOC, DOCX'))
+        );
+        return;
+      }
+
+      if (result.files.single.size <= 10485760) {
+        setState(() {
+          _fileBytes = result.files.single.bytes;
+          _fileName = result.files.single.name;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('File too large (max size: 10MB)'))
+        );
+      }
+    }
+  }
+
+
+  Future<String?> uploadFile() async {
+    if (_fileBytes != null) {
+      try {
+        String userId = _auth.currentUser?.uid ?? '';
+        String filePath = 'private/$userId/$_fileName';
+        final ref = FirebaseStorage.instance.ref().child(filePath);
+        final result = await ref.putData(_fileBytes!);
+        return await result.ref.getDownloadURL();
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to upload file: $e')));
+        return null;
+      }
+    }
+    return null;
   }
 
   void _submitForum() async {
     if (_titleController.text.isEmpty || _contentController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Title and content cannot be empty')),
+          SnackBar(content: Text('Title and content cannot be empty'))
       );
       return;
     }
+
+    String? fileUrl = await uploadFile();
 
     String userId = _auth.currentUser?.uid ?? '';
     Map<String, dynamic> forum = {
@@ -60,6 +110,7 @@ class _AddForumState extends State<AddForum> {
       'authorID': userId,
       'timestamp': ServerValue.timestamp,
       'responses': {},
+      'fileUrl': fileUrl,
     };
 
     await _databaseReference.child('Forums').push().set(forum);
@@ -70,21 +121,16 @@ class _AddForumState extends State<AddForum> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Add Forum'),
-        actions: <Widget>[
-          IconButton(
-            icon: Icon(Icons.arrow_back),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
-        leading: Builder(
-          builder: (BuildContext context) {
-            return IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () { Scaffold.of(context).openDrawer(); },
-              tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
-            );
-          },
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            IconButton(
+              icon: Icon(Icons.arrow_back),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            Text('Add Forum'),
+            SizedBox(width: 48),
+          ],
         ),
       ),
       drawer: OpenDrawer(),
@@ -124,6 +170,26 @@ class _AddForumState extends State<AddForum> {
                   child: Text(value),
                 );
               }).toList(),
+            ),
+            SizedBox(height: 20),
+            _fileName == null
+                ? ElevatedButton(
+              onPressed: pickFile,
+              child: Text('Attach File'),
+            )
+                : Column(
+              children: [
+                Text('Attached File: $_fileName'),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _fileBytes = null;
+                      _fileName = null;
+                    });
+                  },
+                  child: Text('Remove File'),
+                ),
+              ],
             ),
             SizedBox(height: 20),
             ElevatedButton(
