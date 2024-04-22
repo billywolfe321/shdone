@@ -6,6 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'ChatSettingsPage.dart';
 
 class GroupChatPage extends StatefulWidget {
   final String chatId;
@@ -166,14 +167,14 @@ class _GroupChatPageState extends State<GroupChatPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(chatTitle),
-        actions: widget.isAdmin ? [
+        actions: [
           IconButton(
             icon: Icon(Icons.settings),
             onPressed: () {
               Navigator.push(context, MaterialPageRoute(builder: (context) => ChatSettingsPage(chatId: widget.chatId)));
             },
           ),
-        ] : [],
+        ],
       ),
       body: Column(
         children: [
@@ -232,20 +233,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
             ),
         ],
       ),
-    );
-  }
-}
-
-class ChatSettingsPage extends StatelessWidget {
-  final String chatId;
-
-  ChatSettingsPage({required this.chatId});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text("Chat Settings")),
-      body: Center(child: Text("Settings for the chat")),
     );
   }
 }
