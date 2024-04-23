@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -35,12 +36,13 @@ class _ForumsState extends State<Forums> with SingleTickerProviderStateMixin {
       setState(() {
         subjectNames = subjects.map((key, value) => MapEntry(key.toString(), value.toString()));
         subjectFilters = subjects.map((key, value) => MapEntry(key.toString(), false));
+        print(subjectFilters);
       });
     }
   }
 
   void fetchForums() {
-    _databaseReference.child('Forums').onValue.listen((event) {
+    _databaseReference.child('Forums').orderByChild('timestamp').onValue.listen((event) {
       final forumsData = event.snapshot.value as Map<dynamic, dynamic>?;
       final currentUser = _auth.currentUser?.uid;
 
@@ -59,7 +61,7 @@ class _ForumsState extends State<Forums> with SingleTickerProviderStateMixin {
         });
 
         setState(() {
-          allForums = loadedAllForums;
+          allForums = loadedAllForums.reversed.toList();
           userForums = loadedUserForums;
         });
       }
@@ -67,14 +69,29 @@ class _ForumsState extends State<Forums> with SingleTickerProviderStateMixin {
   }
 
   List<Map<String, dynamic>> applySubjectFilters(List<Map<String, dynamic>> forums) {
+    print('called');
+
     Set<String> activeFilters = subjectFilters.entries
         .where((entry) => entry.value)
-        .map((entry) => entry.key)
+        .map((entry) => subjectNames[entry.key])
+        .whereType<String>()
         .toSet();
-    return activeFilters.isEmpty
-        ? forums
-        : forums.where((forum) => activeFilters.contains(forum['subject'])).toList();
+
+    print('Active Filters: $activeFilters');
+
+    List<Map<String, dynamic>> filteredForums = forums.where((forum) {
+      bool subjectMatchesFilter = activeFilters.contains(forum['subject']);
+      print('Forum Subject: ${forum['subject']}, Matches Filter: $subjectMatchesFilter');
+      return subjectMatchesFilter;
+    }).toList();
+
+    print('Filtered Forums: $filteredForums');
+
+    return activeFilters.isEmpty ? forums : filteredForums;
   }
+
+
+
 
   void toggleSubjectFilter(String subjectId) {
     setState(() {
